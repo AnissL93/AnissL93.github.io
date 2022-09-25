@@ -4,16 +4,16 @@ theme = "PaperMod"
 
 [languages]
   [languages.zh]
-    title = "Hyl"
+    title = "Aniss Lan"
     languageName = "中文"
 
   [languages.en]
-    title = "Hyl"
+    title = "Aniss Lan"
     languageName = "English"
 
 [params.homeInfoParams]
-    Title = "Hyl's blog"
-    Content = "A place to record ideas, life, and study"
+    Title = "Aniss Lan"
+    Content = "A place to record life"
 
 [[params.socialIcons]]
 name = "github"
