@@ -1,0 +1,24 @@
+copyright = 'Everything is mine'
+baseurl = "https://anissL93.github.io"
+theme = "PaperMod"
+
+[languages]
+  [languages.zh]
+    title = "Hyl"
+    languageName = "中文"
+
+  [languages.en]
+    title = "Hyl"
+    languageName = "English"
+
+[params.homeInfoParams]
+    Title = "Hyl's blog"
+    Content = "A place to record ideas, life, and study"
+
+[[params.socialIcons]]
+name = "github"
+url = "https://github.com/AnissL93"
+
+[[params.socialIcons]]
+name = "linkin"
+url = "https://github.com/AnissL93"
