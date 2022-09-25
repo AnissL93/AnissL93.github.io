@@ -1,7 +1,7 @@
 ---
 title: "DIY: Hid proxy for BLE keyboards"
 date: 2022-09-13T02:02:24+08:00
-draft: true
+draft: false
 ---
 
 I recently developed a hid proxy for connecting ble keyboards so that I can use my bluetooth keyboards at work, where computers have no bluetooth adapter and a pluggable adapter is also not allowed.
