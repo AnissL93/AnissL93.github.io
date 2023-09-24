@@ -1,12 +1,17 @@
 ---
-title: "Deploy a private cloud and messager by nextcloud and frps"
+title: "Deploy a private cloud and messager by nextcloud and frp"
 date: 2023-09-24T19:08:04+08:00
-draft: false
+draft: true
 ---
 
-Deploy a private cloud and messager by nextcloud and frps.
+This blog records my experience of deploying Nextcloud and Talk. The basic idea is to first deploy the Nextcloud service on my local PC, and use frp, vps, ningx and a public domain to allow public accessing.
 
 * Prepare
-- vps
-- domain
-- a local PC
+- vps (I use linode). Assume the ip addr is <vps-ip>.
+- domain (I use namecheap). Assume the domain is yourdomain.com.
+- a local PC (I use an old thinkpad)
+* Set up domain
+Open manage DNS, and add A record
+
+* Set up vps
+* Set up

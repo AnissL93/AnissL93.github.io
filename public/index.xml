@@ -5,17 +5,7 @@
     <link>https://anissL93.github.io/</link>
     <description>Recent content on Aniss Lan</description>
     <generator>Hugo -- gohugo.io</generator>
-    <copyright>Everything is mine</copyright>
-    <lastBuildDate>Sun, 24 Sep 2023 19:08:04 +0800</lastBuildDate><atom:link href="https://anissL93.github.io/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Deploy a private cloud and messager by nextcloud and frps</title>
-      <link>https://anissL93.github.io/posts/nextcloud/</link>
-      <pubDate>Sun, 24 Sep 2023 19:08:04 +0800</pubDate>
-      
-      <guid>https://anissL93.github.io/posts/nextcloud/</guid>
-      <description> Deploy a private cloud and messager by nextcloud and frps.
-Prepare vps domain a local PC </description>
-    </item>
-    
+    <language>en</language>
+    <copyright>Everything is mine</copyright><atom:link href="https://anissL93.github.io/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
