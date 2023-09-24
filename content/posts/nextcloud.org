@@ -1,0 +1,7 @@
+---
+title: "Deploy a private cloud and messager by nextcloud and frps"
+date: 2023-09-24T19:08:04+08:00
+draft: false
+---
+
+Deploy a private cloud and messager by nextcloud and frps
