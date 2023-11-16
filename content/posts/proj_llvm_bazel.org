@@ -1,0 +1,6 @@
+---
+title: "Build a project depending on llvm using bazel"
+date: 2023-11-16T22:28:34+08:00
+draft: true
+---
+

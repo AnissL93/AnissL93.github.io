@@ -11,7 +11,17 @@ This blog records my experience of deploying Nextcloud and Talk. The basic idea 
 - domain (I use namecheap). Assume the domain is yourdomain.com.
 - a local PC (I use an old thinkpad)
 * Set up domain
-Open manage DNS, and add A record
+We need to set up a domain pointing to the server. Just goto managing DNS, and add an A record. This is for ipv4 address. Fill in the host, which is the prefix of the domain that will link to your nextcloud login page. I set up something like the following table. The ipv6 part is optional.
+
+| Type        | IP Address      | Host      | TTL       |
+|-------------+-----------------+-----------+-----------|
+| A record    | <vps-ipv4-addr> | @         | Automatic |
+| A record    | <vps-ipv4-addr> | nextcloud | Automatic |
+| AAAA record | <vps-ipv6-addr> | @         | Automatic |
+| AAAA record | <vps-ipv6-addr> | nextcloud | Automatic |
+
+The nextcloud address will be nextcloud.yourdomain.com.
 
 * Set up vps
+
 * Set up

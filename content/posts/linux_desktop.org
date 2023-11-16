@@ -1,0 +1,8 @@
+---
+title: "Suckless Linux desktop"
+date: 2023-09-24T21:00:17+08:00
+draft: true
+---
+
+This post records the configuration of my linux desktop using suckless softwares (e.g., dwm, dwmblocks, st).
+
