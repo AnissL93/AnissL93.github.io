@@ -19,6 +19,6 @@ theme = "PaperMod"
 name = "github"
 url = "https://github.com/AnissL93"
 
-[[params.socialIcons]]
-name = "linkin"
-url = "https://github.com/AnissL93"
+# [[params.socialIcons]]
+# name = "linkin"
+# url = "https://github.com/AnissL93"
