@@ -1,6 +1,63 @@
 ---
-title: "Build a project depending on llvm using bazel"
+title: "Setup a project depending on llvm using bazel"
 date: 2023-11-16T22:28:34+08:00
 draft: true
 ---
 
+
+1. Create your repo, such as "BuildWithLLVM"
+2. To add a local repo, copy following files to BuildWithLLVM
+   - llvm-project/utils/bazel/WORKSPACE
+   - .bazelrc
+   - .bazelversion
+   - .bazelignore
+3. Add workspace name to the start of WORKSPACE file
+   #+begin_src bazel
+workspace(name = "build_with_llvm")
+   #+end_src
+4. Change path in WORKSPACE
+   #+begin_src bazel
+new_local_repository(
+    name = "llvm-raw",
+    build_file_content = "# empty",
+# change path pointing to your llvm-project
+    path = "/path/to/llvm-project",
+)
+   #+end_src
+5. Test the build
+   #+begin_src bash
+bazel build --config=generic_gcc @llvm-project//llvm:all
+   #+end_src
+6. Build something depending on llvm
+
+   Add a c++ source file main.cc
+
+   #+begin_src c++
+#include <iostream>
+#include "llvm/Support/FormatVariadic.h"
+
+int main() {
+    std::cout << llvm::formatv("Hello {0}", "llvm!").str() << std::endl;
+    return 0;
+}
+   #+end_src
+
+   Add BUILD file to src folder
+
+   #+begin_src bazel
+cc_binary(
+    name = "main",
+    srcs = ["src/main.cc"],
+    deps = ["@llvm-project//llvm:Support"],
+)
+   #+end_src
+
+   #+begin_src bash
+build run --config=generic_gcc //src:main
+   #+end_src
+
+
+   `Hello llvm!` should be printed.
+
+
+See https://github.com/AnissL93/build_llvm_with_bazel for the code
