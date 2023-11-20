@@ -6,7 +6,7 @@ draft: true
 
 Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from [[https://github.com/tensorflow/tensorflow][Tensorflow]]. I did some modification to make it more convinent to use them in a new project.
 
-For Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/
+For Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in  [[https://github.com/AnissL93/build_llvm_with_bazel][build_llvm_with_bazel]], and the bazel helpers here [[https://github.com/AnissL93/bazel_tools][bazel_tools]]
 
 * Basic idea
 lit is basically a python library, so natually bazel's py_test is used to run lit tests. All extra works are setting up the configuration required by lit main function, mostly just setting up path to your binary and test files.
@@ -16,8 +16,10 @@ Need to add several files into your project.
 
 1. runlit.cfg.py
 
-   - Location: Put this file at the root of the folder of mlir related code.
+   - Location: Put this file at the root of the folder of mlir related code. For example, src/runlit.cfg.py
    - Modify: add your own tools to tool_names
+
+    *lit/runlit.cfg.py*
 
 #+begin_src python
 # Copyright 2019 The TensorFlow Authors. All Rights Reserved.
@@ -105,6 +107,8 @@ llvm_config.add_tool_substitutions(tools, tool_dirs)
     - Location: Put this file at the root of the folder of mlir related code, same with runlit.cfg.py
     - Modify: see need modify in the code
 
+    *lit/runlit.site.cfg.py*
+
 #+begin_src python
 import os
 import platform
@@ -112,12 +116,12 @@ import lit.llvm
 
 ## ================ need modify ================
 mlir_custom_tools_dirs = [
-    'cc/tools'
+    'src
 ]
 # the folder contains all test files
-tests_root_dir = 'cc/'
+tests_root_dir = 'src/'
 # runlit.cfg.py file path
-runlit_cfg_py_path = "cc/runlit.cfg.py"
+runlit_cfg_py_path = "src/runlit.cfg.py"
 ## ================ need modify end ================
 
 # Handle the test srcdir for platforms. On windows, things are weird with bazel.
@@ -165,10 +169,13 @@ lit_config.load_config(
 #+end_src
 
 
- 3. lit_tests.bzl
+ 3. glob_lit_test.bzl
 
-    Location: anywhere you like in the workspace
+    Location: anywhere you like in the workspace. For example, third_party/bazel_build/lit/glob_lit_test.bzl
     Modification: None
+
+    *third_party/bazel_tools/lit/glob_lit_test.bzl*
+
 
     #+begin_src bazel
  # Test definitions for Lit, the LLVM test runner.
@@ -307,19 +314,81 @@ lit_config.load_config(
 
     #+end_src
 
-    4. custom_lit_test.bzl
 
-       Assume
+    4. define a function in your project calling the lit_test function. Set lit_path to the dir with runlit.cfg.py
 
- #+begin_src bazel
-load("//:third_party/bazel_tools/lit_tests.bzl", "glob_lit_tests")
-def pgd_lit_tests(name, data = []):
-    glob_lit_tests(
-        name = name,
-        lit_path = "/path/to/root",
-        data = data + [
-            "@llvm-project//mlir:mlir-opt",
-            # other binary here
-        ],
-    )
- #+end_src
+      *src/custom_lit_tests.bzl*
+
+      #+begin_src bazel
+
+  load("//third_party/bazel_tools/lit:glob_lit_test.bzl", "glob_lit_tests")
+
+
+  def custom_lit_tests(name, data = []):
+      glob_lit_tests(
+          name = name,
+          lit_path = "src",
+          data = data + [
+              "@llvm-project//mlir:mlir-opt",
+              # other binary here
+              "//src:custom-mlir-opt"
+          ],
+      )
+      #+end_src
+
+    5. Add litfile to root path BUILD file
+
+       *src/BUILD*
+
+             #+begin_src bazel
+      filegroup(
+          name = "litfiles",
+          srcs = glob(["runlit*py"]),
+          visibility = ["//src:__subpackages__"],
+      )
+
+      exports_files(["run_lit.sh"])
+             #+end_src
+
+
+* Run lit tests
+
+    Create src/test for all .mlir tests.
+
+    *src/test/BUILD*
+
+       #+begin_src bazel
+load("//src:custom_lit_tests.bzl", "custom_lit_tests")
+
+custom_lit_tests(
+    name = "tests"
+)
+       #+end_src
+
+
+    Copy a simple test from mlir math dialect.
+
+    *src/test/test.mlir*
+
+    #+begin_src mlir
+// RUN: custom-mlir-opt %s | custom-mlir-opt | FileCheck %s
+
+// CHECK-LABEL: func @atan(
+// CHECK-SAME:             %[[F:.*]]: f32, %[[V:.*]]: vector<4xf32>, %[[T:.*]]: tensor<4x4x?xf32>)
+func.func @atan(%f: f32, %v: vector<4xf32>, %t: tensor<4x4x?xf32>) {
+  // CHECK: %{{.*}} = math.atan %[[F]] : f32
+  %0 = math.atan %f : f32
+  // CHECK: %{{.*}} = math.atan %[[V]] : vector<4xf32>
+  %1 = math.atan %v : vector<4xf32>
+  // CHECK: %{{.*}} = math.atan %[[T]] : tensor<4x4x?xf32>
+  %2 = math.atan %t : tensor<4x4x?xf32>
+  return
+}
+    #+end_src
+
+    Run the test
+
+       #+begin_src bash
+
+bazel test --config=geric_gcc //src/test:all
+       #+end_src
