@@ -138,139 +138,139 @@ For Setting up project based on llvm, please see my previous post: https://aniss
 </span></span><span style=display:flex><span><span style=color:#75715e># pylint: enable=undefined-variable</span></span></span></code></pre></div></div><ol><li>glob_lit_test.bzl
 Location: anywhere you like in the workspace. For example, third_party/bazel_build/lit/glob_lit_test.bzl
 Modification: None
-<strong>third_party/bazel_tools/lit/glob_lit_test.bzl</strong></li></ol><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel># Test definitions for Lit, the LLVM test runner.
-#
-# This is reusing the LLVM Lit test runner in the interim until the new build
-# rules are upstreamed.
-# TODO(b/136126535): remove this custom rule.
-&#34;&#34;&#34;Lit runner globbing test
-&#34;&#34;&#34;
-
-load(&#34;@bazel_skylib//lib:paths.bzl&#34;, &#34;paths&#34;)
-
-# Default values used by the test runner.
-_default_test_file_exts = [&#34;mlir&#34;, &#34;.pbtxt&#34;, &#34;.td&#34;]
-_default_driver = &#34;@llvm-project//mlir:run_lit.sh&#34;
-_default_size = &#34;small&#34;
-_default_tags = []
-
-# These are patterns which we should never match, for tests, subdirectories, or
-# test input data files.
-_ALWAYS_EXCLUDE = [
- &#34;**/LICENSE.txt&#34;,
- &#34;**/README.txt&#34;,
- &#34;**/lit.local.cfg&#34;,
- # Exclude input files that have spaces in their names, since bazel
- # cannot cope with such &#34;targets&#34; in the srcs list.
- &#34;**/* *&#34;,
- &#34;**/* */**&#34;,
-]
-
-def _run_lit_test(name, data, lit_path, size, tags, driver, features, exec_properties):
- &#34;&#34;&#34;Runs lit on all tests it can find in `data` under tensorflow/compiler/mlir.
-
- Note that, due to Bazel&#39;s hermetic builds, lit only sees the tests that
- are included in the `data` parameter, regardless of what other tests might
- exist in the directory searched.
-
- Args:
-   name: str, the name of the test, including extension.
-   data: [str], the data input to the test.
-   lit_path: [str], the path to put lit files, start from root folder
-   size: str, the size of the test.
-   tags: [str], tags to attach to the test.
-   driver: str, label of the driver shell script.
-           Note: use of a custom driver is not currently supported
-           and specifying a default driver will abort the tests.
-   features: [str], list of extra features to enable.
- &#34;&#34;&#34;
-
- # Disable tests on windows for now, to enable testing rest of all xla and mlir.
- native.py_test(
-     name = name,
-     srcs = [&#34;@llvm-project//llvm:lit&#34;],
-     tags = tags + [&#34;no_pip&#34;, &#34;no_windows&#34;],
-     args = [
-         lit_path + &#34;/&#34; + paths.basename(data[-1]) + &#34; --config-prefix=runlit -v&#34;,
-     ] + features,
-     data = data + [
-         &#34;//{}:litfiles&#34;.format(lit_path),
-         &#34;@llvm-project//llvm:FileCheck&#34;,
-         &#34;@llvm-project//llvm:count&#34;,
-         &#34;@llvm-project//llvm:not&#34;,
-     ],
-     #        deps = [&#34;@pypi_lit//:pkg&#34;],
-     size = size,
-     main = &#34;lit.py&#34;,
-     exec_properties = exec_properties,
- )
-
-def glob_lit_tests(
-     name = None,
-     lit_path = None,
-     exclude = [],
-     test_file_exts = _default_test_file_exts,
-     default_size = _default_size,
-     size_override = {},
-     data = [],
-     per_test_extra_data = {},
-     default_tags = _default_tags,
-     tags_override = {},
-     driver = _default_driver,
-     features = [],
-     exec_properties = {}):
- &#34;&#34;&#34;Creates all plausible Lit tests (and their inputs) under this directory.
-
- Args:
-   name: str, name of the test_suite rule to generate for running all tests.
-   exclude: [str], paths to exclude (for tests and inputs).
-   test_file_exts: [str], extensions for files that are tests.
-   default_size: str, the test size for targets not in &#34;size_override&#34;.
-   size_override: {str: str}, sizes to use for specific tests.
-   data: [str], additional input data to the test.
-   per_test_extra_data: {str: [str]}, extra data to attach to a given file.
-   default_tags: [str], additional tags to attach to the test.
-   tags_override: {str: str}, tags to add to specific tests.
-   driver: str, label of the driver shell script.
-           Note: use of a custom driver is not currently supported
-           and specifying a default driver will abort the tests.
-   features: [str], list of extra features to enable.
-   exec_properties: a dictionary of properties to pass on.
- &#34;&#34;&#34;
-
- # Ignore some patterns by default for tests and input data.
- exclude = _ALWAYS_EXCLUDE + exclude
-
- tests = native.glob(
-     [&#34;*.&#34; + ext for ext in test_file_exts],
-     exclude = exclude,
- )
-
- # Run tests individually such that errors can be attributed to a specific
- # failure.
- all_tests = []
- for curr_test in tests:
-     all_tests.append(curr_test + &#34;.test&#34;)
-
-     # Instantiate this test with updated parameters.
-     _run_lit_test(
-         name = curr_test + &#34;.test&#34;,
-         data = data + [curr_test] + per_test_extra_data.get(curr_test, []),
-         lit_path = lit_path,
-         size = size_override.get(curr_test, default_size),
-         tags = default_tags + tags_override.get(curr_test, []),
-         driver = driver,
-         features = features,
-         exec_properties = exec_properties,
-     )
-
- # TODO: remove this check after making it a required param.
- if name:
-     native.test_suite(
-         name = name,
-         tests = all_tests,
-         tags = [&#34;manual&#34;],
-     )</code></pre></div><ol><li><p>define a function in your project calling the lit_test function. Set lit_path to the dir with runlit.cfg.py</p><p><strong>src/custom_lit_tests.bzl</strong></p><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel>load(&#34;//third_party/bazel_tools/lit:glob_lit_test.bzl&#34;, &#34;glob_lit_tests&#34;)
+<strong>third_party/bazel_tools/lit/glob_lit_test.bzl</strong></li></ol><div class="src src-python"><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#75715e># Test definitions for Lit, the LLVM test runner.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># This is reusing the LLVM Lit test runner in the interim until the new build</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># rules are upstreamed.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># TODO(b/136126535): remove this custom rule.</span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;&#34;&#34;Lit runner globbing test
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>&#34;&#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>load(<span style=color:#e6db74>&#34;@bazel_skylib//lib:paths.bzl&#34;</span>, <span style=color:#e6db74>&#34;paths&#34;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Default values used by the test runner.</span>
+</span></span><span style=display:flex><span>_default_test_file_exts <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#34;mlir&#34;</span>, <span style=color:#e6db74>&#34;.pbtxt&#34;</span>, <span style=color:#e6db74>&#34;.td&#34;</span>]
+</span></span><span style=display:flex><span>_default_driver <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;@llvm-project//mlir:run_lit.sh&#34;</span>
+</span></span><span style=display:flex><span>_default_size <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;small&#34;</span>
+</span></span><span style=display:flex><span>_default_tags <span style=color:#f92672>=</span> []
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># These are patterns which we should never match, for tests, subdirectories, or</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># test input data files.</span>
+</span></span><span style=display:flex><span>_ALWAYS_EXCLUDE <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;**/LICENSE.txt&#34;</span>,
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;**/README.txt&#34;</span>,
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;**/lit.local.cfg&#34;</span>,
+</span></span><span style=display:flex><span> <span style=color:#75715e># Exclude input files that have spaces in their names, since bazel</span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># cannot cope with such &#34;targets&#34; in the srcs list.</span>
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;**/* *&#34;</span>,
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;**/* */**&#34;</span>,
+</span></span><span style=display:flex><span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>_run_lit_test</span>(name, data, lit_path, size, tags, driver, features, exec_properties):
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;&#34;&#34;Runs lit on all tests it can find in `data` under tensorflow/compiler/mlir.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> Note that, due to Bazel&#39;s hermetic builds, lit only sees the tests that
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> are included in the `data` parameter, regardless of what other tests might
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> exist in the directory searched.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> Args:
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   name: str, the name of the test, including extension.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   data: [str], the data input to the test.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   lit_path: [str], the path to put lit files, start from root folder
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   size: str, the size of the test.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   tags: [str], tags to attach to the test.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   driver: str, label of the driver shell script.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>           Note: use of a custom driver is not currently supported
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>           and specifying a default driver will abort the tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   features: [str], list of extra features to enable.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> &#34;&#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># Disable tests on windows for now, to enable testing rest of all xla and mlir.</span>
+</span></span><span style=display:flex><span> native<span style=color:#f92672>.</span>py_test(
+</span></span><span style=display:flex><span>     name <span style=color:#f92672>=</span> name,
+</span></span><span style=display:flex><span>     srcs <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#34;@llvm-project//llvm:lit&#34;</span>],
+</span></span><span style=display:flex><span>     tags <span style=color:#f92672>=</span> tags <span style=color:#f92672>+</span> [<span style=color:#e6db74>&#34;no_pip&#34;</span>, <span style=color:#e6db74>&#34;no_windows&#34;</span>],
+</span></span><span style=display:flex><span>     args <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>         lit_path <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;/&#34;</span> <span style=color:#f92672>+</span> paths<span style=color:#f92672>.</span>basename(data[<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>]) <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34; --config-prefix=runlit -v&#34;</span>,
+</span></span><span style=display:flex><span>     ] <span style=color:#f92672>+</span> features,
+</span></span><span style=display:flex><span>     data <span style=color:#f92672>=</span> data <span style=color:#f92672>+</span> [
+</span></span><span style=display:flex><span>         <span style=color:#e6db74>&#34;//</span><span style=color:#e6db74>{}</span><span style=color:#e6db74>:litfiles&#34;</span><span style=color:#f92672>.</span>format(lit_path),
+</span></span><span style=display:flex><span>         <span style=color:#e6db74>&#34;@llvm-project//llvm:FileCheck&#34;</span>,
+</span></span><span style=display:flex><span>         <span style=color:#e6db74>&#34;@llvm-project//llvm:count&#34;</span>,
+</span></span><span style=display:flex><span>         <span style=color:#e6db74>&#34;@llvm-project//llvm:not&#34;</span>,
+</span></span><span style=display:flex><span>     ],
+</span></span><span style=display:flex><span>     <span style=color:#75715e>#        deps = [&#34;@pypi_lit//:pkg&#34;],</span>
+</span></span><span style=display:flex><span>     size <span style=color:#f92672>=</span> size,
+</span></span><span style=display:flex><span>     main <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;lit.py&#34;</span>,
+</span></span><span style=display:flex><span>     exec_properties <span style=color:#f92672>=</span> exec_properties,
+</span></span><span style=display:flex><span> )
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>def</span> <span style=color:#a6e22e>glob_lit_tests</span>(
+</span></span><span style=display:flex><span>     name <span style=color:#f92672>=</span> <span style=color:#66d9ef>None</span>,
+</span></span><span style=display:flex><span>     lit_path <span style=color:#f92672>=</span> <span style=color:#66d9ef>None</span>,
+</span></span><span style=display:flex><span>     exclude <span style=color:#f92672>=</span> [],
+</span></span><span style=display:flex><span>     test_file_exts <span style=color:#f92672>=</span> _default_test_file_exts,
+</span></span><span style=display:flex><span>     default_size <span style=color:#f92672>=</span> _default_size,
+</span></span><span style=display:flex><span>     size_override <span style=color:#f92672>=</span> {},
+</span></span><span style=display:flex><span>     data <span style=color:#f92672>=</span> [],
+</span></span><span style=display:flex><span>     per_test_extra_data <span style=color:#f92672>=</span> {},
+</span></span><span style=display:flex><span>     default_tags <span style=color:#f92672>=</span> _default_tags,
+</span></span><span style=display:flex><span>     tags_override <span style=color:#f92672>=</span> {},
+</span></span><span style=display:flex><span>     driver <span style=color:#f92672>=</span> _default_driver,
+</span></span><span style=display:flex><span>     features <span style=color:#f92672>=</span> [],
+</span></span><span style=display:flex><span>     exec_properties <span style=color:#f92672>=</span> {}):
+</span></span><span style=display:flex><span> <span style=color:#e6db74>&#34;&#34;&#34;Creates all plausible Lit tests (and their inputs) under this directory.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> Args:
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   name: str, name of the test_suite rule to generate for running all tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   exclude: [str], paths to exclude (for tests and inputs).
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   test_file_exts: [str], extensions for files that are tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   default_size: str, the test size for targets not in &#34;size_override&#34;.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   size_override: {str: str}, sizes to use for specific tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   data: [str], additional input data to the test.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   per_test_extra_data: {str: [str]}, extra data to attach to a given file.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   default_tags: [str], additional tags to attach to the test.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   tags_override: {str: str}, tags to add to specific tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   driver: str, label of the driver shell script.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>           Note: use of a custom driver is not currently supported
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>           and specifying a default driver will abort the tests.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   features: [str], list of extra features to enable.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>   exec_properties: a dictionary of properties to pass on.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74> &#34;&#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># Ignore some patterns by default for tests and input data.</span>
+</span></span><span style=display:flex><span> exclude <span style=color:#f92672>=</span> _ALWAYS_EXCLUDE <span style=color:#f92672>+</span> exclude
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> tests <span style=color:#f92672>=</span> native<span style=color:#f92672>.</span>glob(
+</span></span><span style=display:flex><span>     [<span style=color:#e6db74>&#34;*.&#34;</span> <span style=color:#f92672>+</span> ext <span style=color:#66d9ef>for</span> ext <span style=color:#f92672>in</span> test_file_exts],
+</span></span><span style=display:flex><span>     exclude <span style=color:#f92672>=</span> exclude,
+</span></span><span style=display:flex><span> )
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># Run tests individually such that errors can be attributed to a specific</span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># failure.</span>
+</span></span><span style=display:flex><span> all_tests <span style=color:#f92672>=</span> []
+</span></span><span style=display:flex><span> <span style=color:#66d9ef>for</span> curr_test <span style=color:#f92672>in</span> tests:
+</span></span><span style=display:flex><span>     all_tests<span style=color:#f92672>.</span>append(curr_test <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;.test&#34;</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>     <span style=color:#75715e># Instantiate this test with updated parameters.</span>
+</span></span><span style=display:flex><span>     _run_lit_test(
+</span></span><span style=display:flex><span>         name <span style=color:#f92672>=</span> curr_test <span style=color:#f92672>+</span> <span style=color:#e6db74>&#34;.test&#34;</span>,
+</span></span><span style=display:flex><span>         data <span style=color:#f92672>=</span> data <span style=color:#f92672>+</span> [curr_test] <span style=color:#f92672>+</span> per_test_extra_data<span style=color:#f92672>.</span>get(curr_test, []),
+</span></span><span style=display:flex><span>         lit_path <span style=color:#f92672>=</span> lit_path,
+</span></span><span style=display:flex><span>         size <span style=color:#f92672>=</span> size_override<span style=color:#f92672>.</span>get(curr_test, default_size),
+</span></span><span style=display:flex><span>         tags <span style=color:#f92672>=</span> default_tags <span style=color:#f92672>+</span> tags_override<span style=color:#f92672>.</span>get(curr_test, []),
+</span></span><span style=display:flex><span>         driver <span style=color:#f92672>=</span> driver,
+</span></span><span style=display:flex><span>         features <span style=color:#f92672>=</span> features,
+</span></span><span style=display:flex><span>         exec_properties <span style=color:#f92672>=</span> exec_properties,
+</span></span><span style=display:flex><span>     )
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span> <span style=color:#75715e># TODO: remove this check after making it a required param.</span>
+</span></span><span style=display:flex><span> <span style=color:#66d9ef>if</span> name:
+</span></span><span style=display:flex><span>     native<span style=color:#f92672>.</span>test_suite(
+</span></span><span style=display:flex><span>         name <span style=color:#f92672>=</span> name,
+</span></span><span style=display:flex><span>         tests <span style=color:#f92672>=</span> all_tests,
+</span></span><span style=display:flex><span>         tags <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#34;manual&#34;</span>],
+</span></span><span style=display:flex><span>     )</span></span></code></pre></div></div><ol><li><p>define a function in your project calling the lit_test function. Set lit_path to the dir with runlit.cfg.py</p><p><strong>src/custom_lit_tests.bzl</strong></p><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel>load(&#34;//third_party/bazel_tools/lit:glob_lit_test.bzl&#34;, &#34;glob_lit_tests&#34;)
 
 
 def custom_lit_tests(name, data = []):
