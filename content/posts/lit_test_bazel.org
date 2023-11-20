@@ -1,7 +1,7 @@
 ---
 title: "Set up llvm lit test with bazel"
 date: 2023-11-21T00:44:05+08:00
-draft: true
+draft: false
 ---
 
 Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from [[https://github.com/tensorflow/tensorflow][Tensorflow]]. I did some modification to make it more convinent to use them in a new project.
