@@ -177,7 +177,7 @@ lit_config.load_config(
     *third_party/bazel_tools/lit/glob_lit_test.bzl*
 
 
-    #+begin_src bazel
+    #+begin_src python
  # Test definitions for Lit, the LLVM test runner.
  #
  # This is reusing the LLVM Lit test runner in the interim until the new build
