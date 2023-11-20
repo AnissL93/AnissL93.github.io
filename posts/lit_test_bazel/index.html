@@ -1,0 +1,310 @@
+<!doctype html><html lang=en dir=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>Set up llvm lit test with bazel | Aniss Lan</title>
+<meta name=keywords content><meta name=description content="Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from Tensorflow. I did some modification to make it more convinent to use them in a new project.
+For Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in build_llvm_with_bazel, and the bazel helpers here bazel_tools"><meta name=author content><link rel=canonical href=https://anissL93.github.io/posts/lit_test_bazel/><link crossorigin=anonymous href=/assets/css/stylesheet.d7fb4cbf980fe688a21621b06a795933c4e6bb2d4070ec940667af1715d84af2.css integrity="sha256-1/tMv5gP5oiiFiGwanlZM8Tmuy1AcOyUBmevFxXYSvI=" rel="preload stylesheet" as=style><script defer crossorigin=anonymous src=/assets/js/highlight.f413e19d0714851f6474e7ee9632408e58ac146fbdbe62747134bea2fa3415e0.js integrity="sha256-9BPhnQcUhR9kdOfuljJAjlisFG+9vmJ0cTS+ovo0FeA=" onload=hljs.initHighlightingOnLoad()></script><link rel=icon href=https://anissL93.github.io/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://anissL93.github.io/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://anissL93.github.io/favicon-32x32.png><link rel=apple-touch-icon href=https://anissL93.github.io/apple-touch-icon.png><link rel=mask-icon href=https://anissL93.github.io/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://anissL93.github.io/posts/lit_test_bazel/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--hljs-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51)}.list{background:var(--theme)}.list:not(.dark)::-webkit-scrollbar-track{background:0 0}.list:not(.dark)::-webkit-scrollbar-thumb{border-color:var(--theme)}}</style></noscript><meta property="og:title" content="Set up llvm lit test with bazel"><meta property="og:description" content="Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from Tensorflow. I did some modification to make it more convinent to use them in a new project.
+For Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in build_llvm_with_bazel, and the bazel helpers here bazel_tools"><meta property="og:type" content="article"><meta property="og:url" content="https://anissL93.github.io/posts/lit_test_bazel/"><meta property="article:section" content="posts"><meta property="article:published_time" content="2023-11-21T00:44:05+08:00"><meta property="article:modified_time" content="2023-11-21T00:44:05+08:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="Set up llvm lit test with bazel"><meta name=twitter:description content="Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from Tensorflow. I did some modification to make it more convinent to use them in a new project.
+For Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in build_llvm_with_bazel, and the bazel helpers here bazel_tools"><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":2,"name":"Posts","item":"https://anissL93.github.io/posts/"},{"@type":"ListItem","position":3,"name":"Set up llvm lit test with bazel","item":"https://anissL93.github.io/posts/lit_test_bazel/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"Set up llvm lit test with bazel","name":"Set up llvm lit test with bazel","description":"Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from Tensorflow. I did some modification to make it more convinent to use them in a new project.\nFor Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in build_llvm_with_bazel, and the bazel helpers here bazel_tools","keywords":[],"articleBody":" Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from Tensorflow. I did some modification to make it more convinent to use them in a new project.\nFor Setting up project based on llvm, please see my previous post: https://anissl93.github.io/posts/proj_llvm_bazel/, The full code is in build_llvm_with_bazel, and the bazel helpers here bazel_tools\nBasic idea lit is basically a python library, so natually bazel's py_test is used to run lit tests. All extra works are setting up the configuration required by lit main function, mostly just setting up path to your binary and test files.\nPrepare files Need to add several files into your project.\nrunlit.cfg.py\nLocation: Put this file at the root of the folder of mlir related code. For example, src/runlit.cfg.py Modify: add your own tools to tool_names lit/runlit.cfg.py # Copyright 2019 The TensorFlow Authors. All Rights Reserved. # # Licensed under the Apache License, Version 2.0 (the \"License\"); # you may not use this file except in compliance with the License. # You may obtain a copy of the License at # # http://www.apache.org/licenses/LICENSE-2.0 # # Unless required by applicable law or agreed to in writing, software # distributed under the License is distributed on an \"AS IS\" BASIS, # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. # See the License for the specific language governing permissions and # limitations under the License. \"\"\"Lit runner configuration.\"\"\" import os import platform import sys import lit.formats from lit.llvm import llvm_config from lit.llvm.subst import ToolSubst # Lint for undefined variables is disabled as config is not defined inside this # file, instead config is injected by way of evaluating runlit.cfg.py from # runlit.site.cfg.py which in turn is evaluated by lit.py. The structure is # common for lit tests and intended to only persist temporarily (b/136126535). # pylint: disable=undefined-variable # Configuration file for the 'lit' test runner. # name: The name of this test suite. config.name = 'MLIR ' + os.path.basename(config.mlir_test_dir) config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell) # suffixes: A list of file extensions to treat as test files. config.suffixes = ['.cc', '.hlo', '.hlotxt', '.json', '.mlir', '.pbtxt', '.py'] # test_source_root: The root path where tests are located. config.test_source_root = config.mlir_test_dir # test_exec_root: The root path where tests should be run. config.test_exec_root = os.environ['RUNFILES_DIR'] if platform.system() == 'Windows': tool_patterns = [ ToolSubst('FileCheck.exe', unresolved='fatal'), # Handle these specially as they are strings searched for during testing. ToolSubst('count.exe', unresolved='fatal'), ToolSubst('not.exe', unresolved='fatal') ] llvm_config.config.substitutions.append( ('%python', '\"%s\"' % (sys.executable))) llvm_config.add_tool_substitutions(tool_patterns, [llvm_config.config.llvm_tools_dir]) else: llvm_config.use_default_substitutions() llvm_config.config.substitutions.append( ('%tfrt_bindir', 'tensorflow/compiler/aot')) # Tweak the PATH to include the tools dir. llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True) tool_dirs = config.mlir_custom_tools_dirs + [ config.mlir_tools_dir, config.llvm_tools_dir ] # need modify tool_names = [ ## add your own tools \"mlir-opt\", \"mlir-translate\" ] tools = [ToolSubst(s, unresolved='ignore') for s in tool_names] llvm_config.add_tool_substitutions(tools, tool_dirs) # pylint: enable=undefined-variable runlit.site.cfg.py\nLocation: Put this file at the root of the folder of mlir related code, same with runlit.cfg.py Modify: see need modify in the code lit/runlit.site.cfg.py\nimport os import platform import lit.llvm ## ================ need modify ================ mlir_custom_tools_dirs = [ 'src ] # the folder contains all test files tests_root_dir = 'src/' # runlit.cfg.py file path runlit_cfg_py_path = \"src/runlit.cfg.py\" ## ================ need modify end ================ # Handle the test srcdir for platforms. On windows, things are weird with bazel. if platform.system() == 'Windows': srcdir = os.environ['TEST_SRCDIR'] real_test_srcdir = srcdir[:srcdir.find(tests_root_dir)] external_srcdir = os.path.join(real_test_srcdir, 'external') else: real_test_srcdir = os.environ['TEST_SRCDIR'] external_srcdir = real_test_srcdir # Lint for undefined variables is disabled as config is not defined inside this # file, instead config is injected by lit.py. The structure is common for lit # tests and intended to only persist temporarily (b/136126535). # pylint: disable=undefined-variable config.llvm_tools_dir = os.path.join(external_srcdir, 'llvm-project', 'llvm') config.mlir_obj_root = os.path.join(real_test_srcdir) config.mlir_tools_dir = os.path.join(external_srcdir, 'llvm-project', 'mlir') # TODO(jpienaar): Replace with suffices in build rule. config.suffixes = ['.td', '.mlir', '.pbtxt'] config.mlir_custom_tools_dirs = [ os.path.join(real_test_srcdir, os.environ['TEST_WORKSPACE'], s) for s in mlir_custom_tools_dirs ] test_dir = os.environ['TEST_TARGET'] test_dir = test_dir.strip('/').rsplit(':', 1)[0] config.mlir_test_dir = os.path.join(real_test_srcdir, os.environ['TEST_WORKSPACE'], test_dir) if platform.system() == 'Windows': # Configure this to work with msys2, TF's preferred windows bash. config.lit_tools_dir = '/usr/bin' lit.llvm.initialize(lit_config, config) # Let the main config do the real work. lit_config.load_config( config, os.path.join( os.path.join(real_test_srcdir, os.environ['TEST_WORKSPACE'], runlit_cfg_py_path))) # pylint: enable=undefined-variable glob_lit_test.bzl Location: anywhere you like in the workspace. For example, third_party/bazel_build/lit/glob_lit_test.bzl Modification: None third_party/bazel_tools/lit/glob_lit_test.bzl # Test definitions for Lit, the LLVM test runner. # # This is reusing the LLVM Lit test runner in the interim until the new build # rules are upstreamed. # TODO(b/136126535): remove this custom rule. \"\"\"Lit runner globbing test \"\"\" load(\"@bazel_skylib//lib:paths.bzl\", \"paths\") # Default values used by the test runner. _default_test_file_exts = [\"mlir\", \".pbtxt\", \".td\"] _default_driver = \"@llvm-project//mlir:run_lit.sh\" _default_size = \"small\" _default_tags = [] # These are patterns which we should never match, for tests, subdirectories, or # test input data files. _ALWAYS_EXCLUDE = [ \"**/LICENSE.txt\", \"**/README.txt\", \"**/lit.local.cfg\", # Exclude input files that have spaces in their names, since bazel # cannot cope with such \"targets\" in the srcs list. \"**/* *\", \"**/* */**\", ] def _run_lit_test(name, data, lit_path, size, tags, driver, features, exec_properties): \"\"\"Runs lit on all tests it can find in `data` under tensorflow/compiler/mlir. Note that, due to Bazel's hermetic builds, lit only sees the tests that are included in the `data` parameter, regardless of what other tests might exist in the directory searched. Args: name: str, the name of the test, including extension. data: [str], the data input to the test. lit_path: [str], the path to put lit files, start from root folder size: str, the size of the test. tags: [str], tags to attach to the test. driver: str, label of the driver shell script. Note: use of a custom driver is not currently supported and specifying a default driver will abort the tests. features: [str], list of extra features to enable. \"\"\" # Disable tests on windows for now, to enable testing rest of all xla and mlir. native.py_test( name = name, srcs = [\"@llvm-project//llvm:lit\"], tags = tags + [\"no_pip\", \"no_windows\"], args = [ lit_path + \"/\" + paths.basename(data[-1]) + \" --config-prefix=runlit -v\", ] + features, data = data + [ \"//{}:litfiles\".format(lit_path), \"@llvm-project//llvm:FileCheck\", \"@llvm-project//llvm:count\", \"@llvm-project//llvm:not\", ], # deps = [\"@pypi_lit//:pkg\"], size = size, main = \"lit.py\", exec_properties = exec_properties, ) def glob_lit_tests( name = None, lit_path = None, exclude = [], test_file_exts = _default_test_file_exts, default_size = _default_size, size_override = {}, data = [], per_test_extra_data = {}, default_tags = _default_tags, tags_override = {}, driver = _default_driver, features = [], exec_properties = {}): \"\"\"Creates all plausible Lit tests (and their inputs) under this directory. Args: name: str, name of the test_suite rule to generate for running all tests. exclude: [str], paths to exclude (for tests and inputs). test_file_exts: [str], extensions for files that are tests. default_size: str, the test size for targets not in \"size_override\". size_override: {str: str}, sizes to use for specific tests. data: [str], additional input data to the test. per_test_extra_data: {str: [str]}, extra data to attach to a given file. default_tags: [str], additional tags to attach to the test. tags_override: {str: str}, tags to add to specific tests. driver: str, label of the driver shell script. Note: use of a custom driver is not currently supported and specifying a default driver will abort the tests. features: [str], list of extra features to enable. exec_properties: a dictionary of properties to pass on. \"\"\" # Ignore some patterns by default for tests and input data. exclude = _ALWAYS_EXCLUDE + exclude tests = native.glob( [\"*.\" + ext for ext in test_file_exts], exclude = exclude, ) # Run tests individually such that errors can be attributed to a specific # failure. all_tests = [] for curr_test in tests: all_tests.append(curr_test + \".test\") # Instantiate this test with updated parameters. _run_lit_test( name = curr_test + \".test\", data = data + [curr_test] + per_test_extra_data.get(curr_test, []), lit_path = lit_path, size = size_override.get(curr_test, default_size), tags = default_tags + tags_override.get(curr_test, []), driver = driver, features = features, exec_properties = exec_properties, ) # TODO: remove this check after making it a required param. if name: native.test_suite( name = name, tests = all_tests, tags = [\"manual\"], ) define a function in your project calling the lit_test function. Set lit_path to the dir with runlit.cfg.py\nsrc/custom_lit_tests.bzl\nload(\"//third_party/bazel_tools/lit:glob_lit_test.bzl\", \"glob_lit_tests\") def custom_lit_tests(name, data = []): glob_lit_tests( name = name, lit_path = \"src\", data = data + [ \"@llvm-project//mlir:mlir-opt\", # other binary here \"//src:custom-mlir-opt\" ], ) Add litfile to root path BUILD file\nsrc/BUILD\nfilegroup( name = \"litfiles\", srcs = glob([\"runlit*py\"]), visibility = [\"//src:__subpackages__\"], ) exports_files([\"run_lit.sh\"]) Run lit tests Create src/test for all .mlir tests.\nsrc/test/BUILD\nload(\"//src:custom_lit_tests.bzl\", \"custom_lit_tests\") custom_lit_tests( name = \"tests\" ) Copy a simple test from mlir math dialect.\nsrc/test/test.mlir\n// RUN: custom-mlir-opt %s | custom-mlir-opt | FileCheck %s // CHECK-LABEL: func @atan( // CHECK-SAME: %[[F:.*]]: f32, %[[V:.*]]: vector\u003c4xf32\u003e, %[[T:.*]]: tensor\u003c4x4x?xf32\u003e) func.func @atan(%f: f32, %v: vector\u003c4xf32\u003e, %t: tensor\u003c4x4x?xf32\u003e) { // CHECK: %{{.*}} = math.atan %[[F]] : f32 %0 = math.atan %f : f32 // CHECK: %{{.*}} = math.atan %[[V]] : vector\u003c4xf32\u003e %1 = math.atan %v : vector\u003c4xf32\u003e // CHECK: %{{.*}} = math.atan %[[T]] : tensor\u003c4x4x?xf32\u003e %2 = math.atan %t : tensor\u003c4x4x?xf32\u003e return } Run the test\nbazel test --config=geric_gcc //src/test:all ","wordCount":"1512","inLanguage":"en","datePublished":"2023-11-21T00:44:05+08:00","dateModified":"2023-11-21T00:44:05+08:00","mainEntityOfPage":{"@type":"WebPage","@id":"https://anissL93.github.io/posts/lit_test_bazel/"},"publisher":{"@type":"Organization","name":"Aniss Lan","logo":{"@type":"ImageObject","url":"https://anissL93.github.io/favicon.ico"}}}</script></head><body id=top><script>localStorage.getItem("pref-theme")==="dark"?document.body.classList.add("dark"):localStorage.getItem("pref-theme")==="light"?document.body.classList.remove("dark"):window.matchMedia("(prefers-color-scheme: dark)").matches&&document.body.classList.add("dark")</script><header class=header><nav class=nav><div class=logo><a href=https://anissL93.github.io accesskey=h title="Aniss Lan (Alt + H)">Aniss Lan</a><div class=logo-switches><button id=theme-toggle accesskey=t title="(Alt + T)"><svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg><svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button><ul class=lang-switch><li>|</li><li><a href=https://anissL93.github.io/zh/ title=中文 aria-label=中文>Zh</a></li></ul></div></div><ul id=menu></ul></nav></header><main class=main><article class=post-single><header class=post-header><h1 class=post-title>Set up llvm lit test with bazel</h1><div class=post-meta>&lt;span title='2023-11-21 00:44:05 +0800 +0800'>November 21, 2023&lt;/span></div></header><div class=post-content><p>Lit is an important tool in llvm project to do text-based tests. This post records how to use lit in a bazel project. Most of the code are pulled from <a href=https://github.com/tensorflow/tensorflow>Tensorflow</a>. I did some modification to make it more convinent to use them in a new project.</p><p>For Setting up project based on llvm, please see my previous post: <a href=https://anissl93.github.io/posts/proj_llvm_bazel/,>https://anissl93.github.io/posts/proj_llvm_bazel/,</a> The full code is in <a href=https://github.com/AnissL93/build_llvm_with_bazel>build_llvm_with_bazel</a>, and the bazel helpers here <a href=https://github.com/AnissL93/bazel_tools>bazel_tools</a></p><div id=outline-container-headline-1 class=outline-2><h2 id=headline-1>Basic idea</h2><div id=outline-text-headline-1 class=outline-text-2><p>lit is basically a python library, so natually bazel's py_test is used to run lit tests. All extra works are setting up the configuration required by lit main function, mostly just setting up path to your binary and test files.</p></div></div><div id=outline-container-headline-2 class=outline-2><h2 id=headline-2>Prepare files</h2><div id=outline-text-headline-2 class=outline-text-2><p>Need to add several files into your project.</p><ol><li><p>runlit.cfg.py</p><ul><li>Location: Put this file at the root of the folder of mlir related code. For example, src/runlit.cfg.py</li><li>Modify: add your own tools to tool_names
+<strong>lit/runlit.cfg.py</strong></li></ul></li></ol><div class="src src-python"><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#75715e># Copyright 2019 The TensorFlow Authors. All Rights Reserved.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Licensed under the Apache License, Version 2.0 (the &#34;License&#34;);</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># you may not use this file except in compliance with the License.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># You may obtain a copy of the License at</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#     http://www.apache.org/licenses/LICENSE-2.0</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>#</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Unless required by applicable law or agreed to in writing, software</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># distributed under the License is distributed on an &#34;AS IS&#34; BASIS,</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># See the License for the specific language governing permissions and</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># limitations under the License.</span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;&#34;&#34;Lit runner configuration.&#34;&#34;&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> os
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> platform
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> sys
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> lit.formats
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> lit.llvm <span style=color:#f92672>import</span> llvm_config
+</span></span><span style=display:flex><span><span style=color:#f92672>from</span> lit.llvm.subst <span style=color:#f92672>import</span> ToolSubst
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Lint for undefined variables is disabled as config is not defined inside this</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># file, instead config is injected by way of evaluating runlit.cfg.py from</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># runlit.site.cfg.py which in turn is evaluated by lit.py. The structure is</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># common for lit tests and intended to only persist temporarily (b/136126535).</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># pylint: disable=undefined-variable</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Configuration file for the &#39;lit&#39; test runner.</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># name: The name of this test suite.</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>name <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;MLIR &#39;</span> <span style=color:#f92672>+</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>basename(config<span style=color:#f92672>.</span>mlir_test_dir)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>test_format <span style=color:#f92672>=</span> lit<span style=color:#f92672>.</span>formats<span style=color:#f92672>.</span>ShTest(<span style=color:#f92672>not</span> llvm_config<span style=color:#f92672>.</span>use_lit_shell)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># suffixes: A list of file extensions to treat as test files.</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>suffixes <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#39;.cc&#39;</span>, <span style=color:#e6db74>&#39;.hlo&#39;</span>, <span style=color:#e6db74>&#39;.hlotxt&#39;</span>, <span style=color:#e6db74>&#39;.json&#39;</span>, <span style=color:#e6db74>&#39;.mlir&#39;</span>, <span style=color:#e6db74>&#39;.pbtxt&#39;</span>, <span style=color:#e6db74>&#39;.py&#39;</span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># test_source_root: The root path where tests are located.</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>test_source_root <span style=color:#f92672>=</span> config<span style=color:#f92672>.</span>mlir_test_dir
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># test_exec_root: The root path where tests should be run.</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>test_exec_root <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;RUNFILES_DIR&#39;</span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> platform<span style=color:#f92672>.</span>system() <span style=color:#f92672>==</span> <span style=color:#e6db74>&#39;Windows&#39;</span>:
+</span></span><span style=display:flex><span>    tool_patterns <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>        ToolSubst(<span style=color:#e6db74>&#39;FileCheck.exe&#39;</span>, unresolved<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;fatal&#39;</span>),
+</span></span><span style=display:flex><span>        <span style=color:#75715e>#  Handle these specially as they are strings searched for during testing.</span>
+</span></span><span style=display:flex><span>        ToolSubst(<span style=color:#e6db74>&#39;count.exe&#39;</span>, unresolved<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;fatal&#39;</span>),
+</span></span><span style=display:flex><span>        ToolSubst(<span style=color:#e6db74>&#39;not.exe&#39;</span>, unresolved<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;fatal&#39;</span>)
+</span></span><span style=display:flex><span>    ]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    llvm_config<span style=color:#f92672>.</span>config<span style=color:#f92672>.</span>substitutions<span style=color:#f92672>.</span>append(
+</span></span><span style=display:flex><span>        (<span style=color:#e6db74>&#39;%python&#39;</span>, <span style=color:#e6db74>&#39;&#34;</span><span style=color:#e6db74>%s</span><span style=color:#e6db74>&#34;&#39;</span> <span style=color:#f92672>%</span> (sys<span style=color:#f92672>.</span>executable)))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    llvm_config<span style=color:#f92672>.</span>add_tool_substitutions(tool_patterns,
+</span></span><span style=display:flex><span>                                       [llvm_config<span style=color:#f92672>.</span>config<span style=color:#f92672>.</span>llvm_tools_dir])
+</span></span><span style=display:flex><span><span style=color:#66d9ef>else</span>:
+</span></span><span style=display:flex><span>    llvm_config<span style=color:#f92672>.</span>use_default_substitutions()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>llvm_config<span style=color:#f92672>.</span>config<span style=color:#f92672>.</span>substitutions<span style=color:#f92672>.</span>append(
+</span></span><span style=display:flex><span>    (<span style=color:#e6db74>&#39;%tfrt_bindir&#39;</span>, <span style=color:#e6db74>&#39;tensorflow/compiler/aot&#39;</span>))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Tweak the PATH to include the tools dir.</span>
+</span></span><span style=display:flex><span>llvm_config<span style=color:#f92672>.</span>with_environment(<span style=color:#e6db74>&#39;PATH&#39;</span>, config<span style=color:#f92672>.</span>llvm_tools_dir, append_path<span style=color:#f92672>=</span><span style=color:#66d9ef>True</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>tool_dirs <span style=color:#f92672>=</span> config<span style=color:#f92672>.</span>mlir_custom_tools_dirs <span style=color:#f92672>+</span> [
+</span></span><span style=display:flex><span>    config<span style=color:#f92672>.</span>mlir_tools_dir, config<span style=color:#f92672>.</span>llvm_tools_dir
+</span></span><span style=display:flex><span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># need modify</span>
+</span></span><span style=display:flex><span>tool_names <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>    <span style=color:#75715e>## add your own tools</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;mlir-opt&#34;</span>,
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;mlir-translate&#34;</span>
+</span></span><span style=display:flex><span>]
+</span></span><span style=display:flex><span>tools <span style=color:#f92672>=</span> [ToolSubst(s, unresolved<span style=color:#f92672>=</span><span style=color:#e6db74>&#39;ignore&#39;</span>) <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> tool_names]
+</span></span><span style=display:flex><span>llvm_config<span style=color:#f92672>.</span>add_tool_substitutions(tools, tool_dirs)
+</span></span><span style=display:flex><span><span style=color:#75715e># pylint: enable=undefined-variable</span></span></span></code></pre></div></div><ol><li><p>runlit.site.cfg.py</p><ul><li>Location: Put this file at the root of the folder of mlir related code, same with runlit.cfg.py</li><li>Modify: see need modify in the code</li></ul><p><strong>lit/runlit.site.cfg.py</strong></p></li></ol><div class="src src-python"><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-python data-lang=python><span style=display:flex><span><span style=color:#f92672>import</span> os
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> platform
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> lit.llvm
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>## ================ need modify ================</span>
+</span></span><span style=display:flex><span>mlir_custom_tools_dirs <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#39;src</span>
+</span></span><span style=display:flex><span>]
+</span></span><span style=display:flex><span><span style=color:#75715e># the folder contains all test files</span>
+</span></span><span style=display:flex><span>tests_root_dir <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;src/&#39;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># runlit.cfg.py file path</span>
+</span></span><span style=display:flex><span>runlit_cfg_py_path <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;src/runlit.cfg.py&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>## ================ need modify end ================</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Handle the test srcdir for platforms. On windows, things are weird with bazel.</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> platform<span style=color:#f92672>.</span>system() <span style=color:#f92672>==</span> <span style=color:#e6db74>&#39;Windows&#39;</span>:
+</span></span><span style=display:flex><span>  srcdir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_SRCDIR&#39;</span>]
+</span></span><span style=display:flex><span>  real_test_srcdir <span style=color:#f92672>=</span> srcdir[:srcdir<span style=color:#f92672>.</span>find(tests_root_dir)]
+</span></span><span style=display:flex><span>  external_srcdir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(real_test_srcdir, <span style=color:#e6db74>&#39;external&#39;</span>)
+</span></span><span style=display:flex><span><span style=color:#66d9ef>else</span>:
+</span></span><span style=display:flex><span>  real_test_srcdir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_SRCDIR&#39;</span>]
+</span></span><span style=display:flex><span>  external_srcdir <span style=color:#f92672>=</span> real_test_srcdir
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Lint for undefined variables is disabled as config is not defined inside this</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># file, instead config is injected by lit.py. The structure is common for lit</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># tests and intended to only persist temporarily (b/136126535).</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># pylint: disable=undefined-variable</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>llvm_tools_dir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(external_srcdir, <span style=color:#e6db74>&#39;llvm-project&#39;</span>, <span style=color:#e6db74>&#39;llvm&#39;</span>)
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>mlir_obj_root <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(real_test_srcdir)
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>mlir_tools_dir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(external_srcdir, <span style=color:#e6db74>&#39;llvm-project&#39;</span>, <span style=color:#e6db74>&#39;mlir&#39;</span>)
+</span></span><span style=display:flex><span><span style=color:#75715e># TODO(jpienaar): Replace with suffices in build rule.</span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>suffixes <span style=color:#f92672>=</span> [<span style=color:#e6db74>&#39;.td&#39;</span>, <span style=color:#e6db74>&#39;.mlir&#39;</span>, <span style=color:#e6db74>&#39;.pbtxt&#39;</span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>mlir_custom_tools_dirs <span style=color:#f92672>=</span> [
+</span></span><span style=display:flex><span>    os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(real_test_srcdir, os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_WORKSPACE&#39;</span>], s)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>for</span> s <span style=color:#f92672>in</span> mlir_custom_tools_dirs
+</span></span><span style=display:flex><span>]
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>test_dir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_TARGET&#39;</span>]
+</span></span><span style=display:flex><span>test_dir <span style=color:#f92672>=</span> test_dir<span style=color:#f92672>.</span>strip(<span style=color:#e6db74>&#39;/&#39;</span>)<span style=color:#f92672>.</span>rsplit(<span style=color:#e6db74>&#39;:&#39;</span>, <span style=color:#ae81ff>1</span>)[<span style=color:#ae81ff>0</span>]
+</span></span><span style=display:flex><span>config<span style=color:#f92672>.</span>mlir_test_dir <span style=color:#f92672>=</span> os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(real_test_srcdir,
+</span></span><span style=display:flex><span>                                    os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_WORKSPACE&#39;</span>], test_dir)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> platform<span style=color:#f92672>.</span>system() <span style=color:#f92672>==</span> <span style=color:#e6db74>&#39;Windows&#39;</span>:
+</span></span><span style=display:flex><span>  <span style=color:#75715e># Configure this to work with msys2, TF&#39;s preferred windows bash.</span>
+</span></span><span style=display:flex><span>  config<span style=color:#f92672>.</span>lit_tools_dir <span style=color:#f92672>=</span> <span style=color:#e6db74>&#39;/usr/bin&#39;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>lit<span style=color:#f92672>.</span>llvm<span style=color:#f92672>.</span>initialize(lit_config, config)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Let the main config do the real work.</span>
+</span></span><span style=display:flex><span>lit_config<span style=color:#f92672>.</span>load_config(
+</span></span><span style=display:flex><span>    config,
+</span></span><span style=display:flex><span>    os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(
+</span></span><span style=display:flex><span>        os<span style=color:#f92672>.</span>path<span style=color:#f92672>.</span>join(real_test_srcdir, os<span style=color:#f92672>.</span>environ[<span style=color:#e6db74>&#39;TEST_WORKSPACE&#39;</span>],
+</span></span><span style=display:flex><span>                     runlit_cfg_py_path)))
+</span></span><span style=display:flex><span><span style=color:#75715e># pylint: enable=undefined-variable</span></span></span></code></pre></div></div><ol><li>glob_lit_test.bzl
+Location: anywhere you like in the workspace. For example, third_party/bazel_build/lit/glob_lit_test.bzl
+Modification: None
+<strong>third_party/bazel_tools/lit/glob_lit_test.bzl</strong></li></ol><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel># Test definitions for Lit, the LLVM test runner.
+#
+# This is reusing the LLVM Lit test runner in the interim until the new build
+# rules are upstreamed.
+# TODO(b/136126535): remove this custom rule.
+&#34;&#34;&#34;Lit runner globbing test
+&#34;&#34;&#34;
+
+load(&#34;@bazel_skylib//lib:paths.bzl&#34;, &#34;paths&#34;)
+
+# Default values used by the test runner.
+_default_test_file_exts = [&#34;mlir&#34;, &#34;.pbtxt&#34;, &#34;.td&#34;]
+_default_driver = &#34;@llvm-project//mlir:run_lit.sh&#34;
+_default_size = &#34;small&#34;
+_default_tags = []
+
+# These are patterns which we should never match, for tests, subdirectories, or
+# test input data files.
+_ALWAYS_EXCLUDE = [
+ &#34;**/LICENSE.txt&#34;,
+ &#34;**/README.txt&#34;,
+ &#34;**/lit.local.cfg&#34;,
+ # Exclude input files that have spaces in their names, since bazel
+ # cannot cope with such &#34;targets&#34; in the srcs list.
+ &#34;**/* *&#34;,
+ &#34;**/* */**&#34;,
+]
+
+def _run_lit_test(name, data, lit_path, size, tags, driver, features, exec_properties):
+ &#34;&#34;&#34;Runs lit on all tests it can find in `data` under tensorflow/compiler/mlir.
+
+ Note that, due to Bazel&#39;s hermetic builds, lit only sees the tests that
+ are included in the `data` parameter, regardless of what other tests might
+ exist in the directory searched.
+
+ Args:
+   name: str, the name of the test, including extension.
+   data: [str], the data input to the test.
+   lit_path: [str], the path to put lit files, start from root folder
+   size: str, the size of the test.
+   tags: [str], tags to attach to the test.
+   driver: str, label of the driver shell script.
+           Note: use of a custom driver is not currently supported
+           and specifying a default driver will abort the tests.
+   features: [str], list of extra features to enable.
+ &#34;&#34;&#34;
+
+ # Disable tests on windows for now, to enable testing rest of all xla and mlir.
+ native.py_test(
+     name = name,
+     srcs = [&#34;@llvm-project//llvm:lit&#34;],
+     tags = tags + [&#34;no_pip&#34;, &#34;no_windows&#34;],
+     args = [
+         lit_path + &#34;/&#34; + paths.basename(data[-1]) + &#34; --config-prefix=runlit -v&#34;,
+     ] + features,
+     data = data + [
+         &#34;//{}:litfiles&#34;.format(lit_path),
+         &#34;@llvm-project//llvm:FileCheck&#34;,
+         &#34;@llvm-project//llvm:count&#34;,
+         &#34;@llvm-project//llvm:not&#34;,
+     ],
+     #        deps = [&#34;@pypi_lit//:pkg&#34;],
+     size = size,
+     main = &#34;lit.py&#34;,
+     exec_properties = exec_properties,
+ )
+
+def glob_lit_tests(
+     name = None,
+     lit_path = None,
+     exclude = [],
+     test_file_exts = _default_test_file_exts,
+     default_size = _default_size,
+     size_override = {},
+     data = [],
+     per_test_extra_data = {},
+     default_tags = _default_tags,
+     tags_override = {},
+     driver = _default_driver,
+     features = [],
+     exec_properties = {}):
+ &#34;&#34;&#34;Creates all plausible Lit tests (and their inputs) under this directory.
+
+ Args:
+   name: str, name of the test_suite rule to generate for running all tests.
+   exclude: [str], paths to exclude (for tests and inputs).
+   test_file_exts: [str], extensions for files that are tests.
+   default_size: str, the test size for targets not in &#34;size_override&#34;.
+   size_override: {str: str}, sizes to use for specific tests.
+   data: [str], additional input data to the test.
+   per_test_extra_data: {str: [str]}, extra data to attach to a given file.
+   default_tags: [str], additional tags to attach to the test.
+   tags_override: {str: str}, tags to add to specific tests.
+   driver: str, label of the driver shell script.
+           Note: use of a custom driver is not currently supported
+           and specifying a default driver will abort the tests.
+   features: [str], list of extra features to enable.
+   exec_properties: a dictionary of properties to pass on.
+ &#34;&#34;&#34;
+
+ # Ignore some patterns by default for tests and input data.
+ exclude = _ALWAYS_EXCLUDE + exclude
+
+ tests = native.glob(
+     [&#34;*.&#34; + ext for ext in test_file_exts],
+     exclude = exclude,
+ )
+
+ # Run tests individually such that errors can be attributed to a specific
+ # failure.
+ all_tests = []
+ for curr_test in tests:
+     all_tests.append(curr_test + &#34;.test&#34;)
+
+     # Instantiate this test with updated parameters.
+     _run_lit_test(
+         name = curr_test + &#34;.test&#34;,
+         data = data + [curr_test] + per_test_extra_data.get(curr_test, []),
+         lit_path = lit_path,
+         size = size_override.get(curr_test, default_size),
+         tags = default_tags + tags_override.get(curr_test, []),
+         driver = driver,
+         features = features,
+         exec_properties = exec_properties,
+     )
+
+ # TODO: remove this check after making it a required param.
+ if name:
+     native.test_suite(
+         name = name,
+         tests = all_tests,
+         tags = [&#34;manual&#34;],
+     )</code></pre></div><ol><li><p>define a function in your project calling the lit_test function. Set lit_path to the dir with runlit.cfg.py</p><p><strong>src/custom_lit_tests.bzl</strong></p><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel>load(&#34;//third_party/bazel_tools/lit:glob_lit_test.bzl&#34;, &#34;glob_lit_tests&#34;)
+
+
+def custom_lit_tests(name, data = []):
+glob_lit_tests(
+    name = name,
+    lit_path = &#34;src&#34;,
+    data = data + [
+        &#34;@llvm-project//mlir:mlir-opt&#34;,
+        # other binary here
+        &#34;//src:custom-mlir-opt&#34;
+    ],
+)</code></pre></div></li><li><p>Add litfile to root path BUILD file</p><p><strong>src/BUILD</strong></p><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel>filegroup(
+name = &#34;litfiles&#34;,
+srcs = glob([&#34;runlit*py&#34;]),
+visibility = [&#34;//src:__subpackages__&#34;],
+)
+
+exports_files([&#34;run_lit.sh&#34;])</code></pre></div></li></ol></div></div><div id=outline-container-headline-3 class=outline-2><h2 id=headline-3>Run lit tests</h2><div id=outline-text-headline-3 class=outline-text-2><p>Create src/test for all .mlir tests.</p><p><strong>src/test/BUILD</strong></p><div class="src src-bazel"><pre tabindex=0><code class=language-bazel data-lang=bazel>load(&#34;//src:custom_lit_tests.bzl&#34;, &#34;custom_lit_tests&#34;)
+
+custom_lit_tests(
+name = &#34;tests&#34;
+)</code></pre></div><p>Copy a simple test from mlir math dialect.</p><p><strong>src/test/test.mlir</strong></p><div class="src src-mlir"><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-mlir data-lang=mlir><span style=display:flex><span><span style=color:#75715e>// RUN: custom-mlir-opt %s | custom-mlir-opt | FileCheck %s
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// CHECK-LABEL: func @atan(
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// CHECK-SAME:             %[[F:.*]]: f32, %[[V:.*]]: vector&lt;4xf32&gt;, %[[T:.*]]: tensor&lt;4x4x?xf32&gt;)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span>.<span style=color:#66d9ef>func</span> <span style=color:#a6e22e>@atan</span>(%f: <span style=color:#66d9ef>f32</span>, %v: <span style=color:#66d9ef>vector</span>&lt;<span style=color:#ae81ff>4x</span><span style=color:#66d9ef>f32</span>&gt;, %t: <span style=color:#66d9ef>tensor</span>&lt;<span style=color:#ae81ff>4x4x?x</span><span style=color:#66d9ef>f32</span>&gt;) {
+</span></span><span style=display:flex><span><span style=color:#75715e>// CHECK: %{{.*}} = math.atan %[[F]] : f32
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>%0 = math.atan %f : <span style=color:#66d9ef>f32</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// CHECK: %{{.*}} = math.atan %[[V]] : vector&lt;4xf32&gt;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>%1 = math.atan %v : <span style=color:#66d9ef>vector</span>&lt;<span style=color:#ae81ff>4x</span><span style=color:#66d9ef>f32</span>&gt;
+</span></span><span style=display:flex><span><span style=color:#75715e>// CHECK: %{{.*}} = math.atan %[[T]] : tensor&lt;4x4x?xf32&gt;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>%2 = math.atan %t : <span style=color:#66d9ef>tensor</span>&lt;<span style=color:#ae81ff>4x4x?x</span><span style=color:#66d9ef>f32</span>&gt;
+</span></span><span style=display:flex><span><span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>}</span></span></code></pre></div></div><p>Run the test</p><div class="src src-bash"><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-bash data-lang=bash><span style=display:flex><span>bazel test --config<span style=color:#f92672>=</span>geric_gcc //src/test:all</span></span></code></pre></div></div></div></div></div><footer class=post-footer><ul class=post-tags></ul></footer></article></main><footer class=footer><span>Everything is mine</span>
+<span>Powered by
+<a href=https://gohugo.io/ rel="noopener noreferrer" target=_blank>Hugo</a> &
+        <a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top aria-label="go to top" title="Go to Top (Alt + G)" class=top-link id=top-link accesskey=g><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentcolor"><path d="M12 6H0l6-6z"/></svg></a><script>let menu=document.getElementById("menu");menu&&(menu.scrollLeft=localStorage.getItem("menu-scroll-position"),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}),document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var mybutton=document.getElementById("top-link");window.onscroll=function(){document.body.scrollTop>800||document.documentElement.scrollTop>800?(mybutton.style.visibility="visible",mybutton.style.opacity="1"):(mybutton.style.visibility="hidden",mybutton.style.opacity="0")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{document.body.className.includes("dark")?(document.body.classList.remove("dark"),localStorage.setItem("pref-theme","light")):(document.body.classList.add("dark"),localStorage.setItem("pref-theme","dark"))})</script></body></html>
